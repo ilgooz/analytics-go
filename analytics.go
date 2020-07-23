@@ -245,8 +245,6 @@ func (c *client) sendAsync(msgs []message, wg *sync.WaitGroup, ex *executor) {
 
 // Send batch request.
 func (c *client) send(msgs []message) {
-	const attempts = 10
-
 	b, err := json.Marshal(batch{
 		MessageId: c.uid(),
 		SentAt:    c.now(),
@@ -260,24 +258,7 @@ func (c *client) send(msgs []message) {
 		return
 	}
 
-	for i := 0; i != attempts; i++ {
-		if err = c.upload(b); err == nil {
-			c.notifySuccess(msgs)
-			return
-		}
-
-		// Wait for either a retry timeout or the client to be closed.
-		select {
-		case <-time.After(c.RetryAfter(i)):
-		case <-c.quit:
-			c.errorf("%d messages dropped because they failed to be sent and the client was closed", len(msgs))
-			c.notifyFailure(msgs, err)
-			return
-		}
-	}
-
-	c.errorf("%d messages dropped because they failed to be sent after %d attempts", len(msgs), attempts)
-	c.notifyFailure(msgs, err)
+	c.upload(b)
 }
 
 // Upload serialized batch message.
